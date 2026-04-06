@@ -2,8 +2,8 @@
 
 import React from 'react';
 import { LogEntry } from '@/lib/types';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getDownloadUrl } from '@/lib/api';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface ProgressPanelProps {
   processedRows: number;
@@ -25,6 +25,12 @@ export default function ProgressPanel({
   generating = false,
 }: ProgressPanelProps) {
   const progress = totalRows > 0 ? Math.round((processedRows / totalRows) * 100) : 0;
+
+  // Format data for Recharts
+  const chartData = tokenUsageData.map((d) => ({
+    name: `Batch ${d.batch}`,
+    tokens: d.tokens,
+  }));
 
   return (
     <div className="panel">
@@ -55,22 +61,50 @@ export default function ProgressPanel({
         <div className="progress-fill" style={{ width: `${progress}%` }} />
       </div>
 
-      {tokenUsageData.length > 0 && (
-        <div style={{ marginTop: '20px', marginBottom: '10px' }}>
-          <div className="progress-title" style={{ marginBottom: '15px' }}>API Token Consumption per Batch</div>
-          <div style={{ width: '100%', height: 200 }}>
+      {(generating || chartData.length > 0) && (
+        <div style={{ marginTop: '24px', marginBottom: '16px' }}>
+          <div className="progress-title" style={{ marginBottom: '16px' }}>API Token Consumption per Batch</div>
+          <div style={{ width: '100%', height: 220, marginLeft: '-24px' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={tokenUsageData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                <XAxis dataKey="batch" tick={{ fill: 'var(--color-text-secondary)', fontSize: 12 }} />
-                <YAxis tick={{ fill: 'var(--color-text-secondary)', fontSize: 12 }} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: '8px' }}
-                  itemStyle={{ color: 'var(--color-text)' }}
-                  labelStyle={{ color: 'var(--color-text-secondary)' }}
+              <LineChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
+                <XAxis 
+                  dataKey="name" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: 'var(--muted)', fontSize: 10, fontFamily: "'DM Mono', monospace" }} 
+                  dy={10}
                 />
-                <Bar dataKey="tokens" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
-              </BarChart>
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: 'var(--muted)', fontSize: 10, fontFamily: "'DM Mono', monospace" }} 
+                  dx={-10}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'var(--surface2)', 
+                    border: '1px solid var(--border)', 
+                    borderRadius: '8px', 
+                    fontSize: '11px',
+                    fontFamily: "'DM Mono', monospace",
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                  }}
+                  itemStyle={{ color: 'var(--accent)', fontWeight: 600 }}
+                  labelStyle={{ color: 'var(--text-secondary)', marginBottom: '4px' }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="tokens" 
+                  stroke="var(--accent)" 
+                  strokeWidth={2.5}
+                  dot={{ r: 3, fill: 'var(--surface)', stroke: 'var(--accent)', strokeWidth: 2 }}
+                  activeDot={{ r: 6, fill: 'var(--accent)', stroke: 'var(--surface)', strokeWidth: 2 }}
+                  isAnimationActive={true}
+                  animationDuration={1000}
+                  animationEasing="ease-out"
+                />
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
