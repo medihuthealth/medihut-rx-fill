@@ -111,3 +111,25 @@ export async function startGeneration(
 export function getDownloadUrl(downloadId: string): string {
   return `${API_BASE}/api/excel/download/${downloadId}`;
 }
+
+/**
+ * Pause the generation process
+ */
+export async function pauseGeneration(uploadId: string): Promise<void> {
+  await fetch(`${API_BASE}/api/generate/pause`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uploadId }),
+  });
+}
+
+/**
+ * Resume the generation process
+ */
+export async function resumeGeneration(uploadId: string): Promise<void> {
+  await fetch(`${API_BASE}/api/generate/resume`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uploadId }),
+  });
+}

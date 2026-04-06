@@ -9,7 +9,7 @@ import ColumnMappingPanel from '@/components/ColumnMapping';
 import Settings from '@/components/Settings';
 import ProgressPanel from '@/components/ProgressPanel';
 import ResultsPanel from '@/components/ResultsPanel';
-import { startGeneration } from '@/lib/api';
+import { startGeneration, pauseGeneration, resumeGeneration } from '@/lib/api';
 import {
   AppState,
   AiProvider,
@@ -42,6 +42,7 @@ type Action =
   | { type: 'PROGRESS_EVENT'; event: ProgressEvent }
   | { type: 'GENERATION_COMPLETE'; downloadId: string; filled: number; total: number }
   | { type: 'GENERATION_ERROR'; message: string }
+  | { type: 'SET_PAUSED'; isPaused: boolean }
   | { type: 'SET_ERROR'; message: string | null };
 
 const initialState: AppState = {
@@ -67,6 +68,7 @@ const initialState: AppState = {
   logs: [],
   tokenUsageData: [],
   downloadId: null,
+  isPaused: false,
   resultStats: null,
   error: null,
 };
@@ -119,6 +121,7 @@ function reducer(state: AppState, action: Action): AppState {
         logs: [],
         tokenUsageData: [],
         downloadId: null,
+        isPaused: false,
         resultStats: null,
         error: null,
       };
@@ -138,6 +141,7 @@ function reducer(state: AppState, action: Action): AppState {
         processedRows: 0,
         totalRows: 0,
         downloadId: null,
+        isPaused: false,
         resultStats: null,
         error: null,
       };
@@ -155,13 +159,18 @@ function reducer(state: AppState, action: Action): AppState {
         else newLogs.push(entry);
       } else if (event.type === 'batch_done') {
         const existingIdx = newLogs.findIndex((l) => l.id === logId);
-        const entry: LogEntry = { id: logId, status: 'ok', message: event.message || '' };
+        const entry: LogEntry = { id: logId, status: 'ok', message: event.message || '', downloadId: event.partialDownloadId };
         if (existingIdx >= 0) newLogs[existingIdx] = entry;
         else newLogs.push(entry);
         
         if (event.batch !== undefined && event.tokens !== undefined) {
           newTokenUsageData = [...state.tokenUsageData, { batch: event.batch, tokens: event.tokens }];
         }
+      } else if (event.type === 'paused') {
+        const existingIdx = newLogs.findIndex((l) => l.id === logId);
+        const entry: LogEntry = { id: logId, status: 'proc', message: event.message || '' };
+        if (existingIdx >= 0) newLogs[existingIdx] = entry;
+        else newLogs.push(entry);
       } else if (event.type === 'error' && event.batch) {
         const existingIdx = newLogs.findIndex((l) => l.id === logId);
         const entry: LogEntry = { id: logId, status: 'err', message: event.message || '' };
@@ -190,6 +199,8 @@ function reducer(state: AppState, action: Action): AppState {
       };
     case 'GENERATION_ERROR':
       return { ...state, generating: false, error: action.message };
+    case 'SET_PAUSED':
+      return { ...state, isPaused: action.isPaused };
     case 'SET_ERROR':
       return { ...state, error: action.message };
     default:
@@ -271,6 +282,13 @@ export default function Home() {
         (event: ProgressEvent) => {
           dispatch({ type: 'PROGRESS_EVENT', event });
 
+          if (event.type === 'paused') {
+            dispatch({ type: 'SET_PAUSED', isPaused: true });
+          } else if (event.type === 'progress' || event.type === 'batch_done') {
+             // In case it was paused and now isn't
+            dispatch({ type: 'SET_PAUSED', isPaused: false });
+          }
+
           if (event.type === 'complete' && event.downloadId) {
             const match = event.message?.match(/(\d+)\/(\d+)/);
             const filled = match ? parseInt(match[1]) : event.processed || 0;
@@ -287,6 +305,21 @@ export default function Home() {
       dispatch({ type: 'GENERATION_ERROR', message: err.message || 'Generation failed' });
     }
   }, [state.columnMapping, state.apiKey, state.uploadId, state.provider, state.model, state.batchSize, state.outputFileName]);
+
+  const handlePauseToggle = useCallback(async () => {
+    if (!state.uploadId) return;
+    try {
+      if (state.isPaused) {
+        await resumeGeneration(state.uploadId);
+        dispatch({ type: 'SET_PAUSED', isPaused: false });
+      } else {
+        await pauseGeneration(state.uploadId);
+        dispatch({ type: 'SET_PAUSED', isPaused: true });
+      }
+    } catch (err: any) {
+      dispatch({ type: 'SET_ERROR', message: err.message || 'Action failed' });
+    }
+  }, [state.uploadId, state.isPaused]);
 
   return (
     <div className="wrap">
@@ -362,6 +395,9 @@ export default function Home() {
           totalRows={state.totalRows}
           logs={state.logs}
           tokenUsageData={state.tokenUsageData}
+          isPaused={state.isPaused}
+          onPauseToggle={handlePauseToggle}
+          generating={state.generating}
         />
       )}
 

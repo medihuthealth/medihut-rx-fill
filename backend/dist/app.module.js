@@ -11,12 +11,14 @@ const common_1 = require("@nestjs/common");
 const ai_module_1 = require("./ai/ai.module");
 const excel_module_1 = require("./excel/excel.module");
 const generate_module_1 = require("./generate/generate.module");
+const app_controller_1 = require("./app.controller");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
 exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
         imports: [ai_module_1.AiModule, excel_module_1.ExcelModule, generate_module_1.GenerateModule],
+        controllers: [app_controller_1.AppController],
     })
 ], AppModule);
 //# sourceMappingURL=app.module.js.map

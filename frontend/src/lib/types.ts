@@ -100,13 +100,14 @@ export const FIELD_MAPPINGS: FieldMapping[] = [
 ];
 
 export interface ProgressEvent {
-  type: 'progress' | 'batch_done' | 'error' | 'complete';
+  type: 'progress' | 'batch_done' | 'error' | 'complete' | 'paused';
   batch?: number;
   totalBatches?: number;
   processed?: number;
   total?: number;
   message?: string;
   downloadId?: string;
+  partialDownloadId?: string;
   tokens?: number;
 }
 
@@ -114,6 +115,7 @@ export interface LogEntry {
   id: string;
   status: 'proc' | 'ok' | 'err';
   message: string;
+  downloadId?: string;
 }
 
 export type WizardStep = 1 | 2 | 3 | 4;
@@ -141,6 +143,7 @@ export interface AppState {
   logs: LogEntry[];
   tokenUsageData: { batch: number; tokens: number }[];
   downloadId: string | null;
+  isPaused: boolean;
   resultStats: { total: number; filled: number; needReview: number } | null;
   error: string | null;
 }

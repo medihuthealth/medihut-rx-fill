@@ -747,11 +747,15 @@ body::before {
 .help-note { font-size: 10px; color: var(--muted); line-height: 1.65; margin-top: 8px; }
 
 /* ── Responsive ───────────────────────────────────── */
-@media (max-width: 580px) {
-  .provider-tabs { flex-wrap: wrap; }
-  .provider-tab { min-width: calc(50% - 4px); }
-  .map-grid { grid-template-columns: 1fr 1fr; }
-  .stats-row { grid-template-columns: 1fr 1fr; }
+@media (max-width: 650px) {
+  .provider-tabs { flex-direction: column; }
+  .provider-tab { width: 100%; min-width: unset; }
+  .map-grid { grid-template-columns: 1fr; }
+  .stats-row { grid-template-columns: 1fr; }
   .key-area { flex-direction: column; }
   .header-badge { display: none; }
+  .wrap { padding: 0 15px 40px; }
+  
+  .settings-row { flex-direction: column; align-items: stretch; }
+  .setting-item { width: 100%; }
 }

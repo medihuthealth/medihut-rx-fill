@@ -1,0 +1,59 @@
+# Node modules
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Dependency directories
+jspm_packages/
+
+# TypeScript
+*.tsbuildinfo
+
+# Coverage
+coverage/
+
+# Testing
+test-results/
+
+# Nest CLI
+.nestcli.json
+
+# Docker (optional)
+docker-compose.override.yml
+
+# Misc
+*.tgz
+*.tmp
+*.temp
+.cache/
+
+# Firebase (if used)
+.firebase/
+
+# Local development
+*.local
