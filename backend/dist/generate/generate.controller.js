@@ -86,6 +86,18 @@ let GenerateController = class GenerateController {
         res.write('data: [DONE]\n\n');
         res.end();
     }
+    pauseGeneration(body) {
+        if (!body.uploadId)
+            throw new common_1.HttpException('uploadId required', common_1.HttpStatus.BAD_REQUEST);
+        this.generateService.pauseJob(body.uploadId);
+        return { ok: true, status: 'paused' };
+    }
+    resumeGeneration(body) {
+        if (!body.uploadId)
+            throw new common_1.HttpException('uploadId required', common_1.HttpStatus.BAD_REQUEST);
+        this.generateService.resumeJob(body.uploadId);
+        return { ok: true, status: 'resumed' };
+    }
 };
 exports.GenerateController = GenerateController;
 __decorate([
@@ -96,6 +108,20 @@ __decorate([
     __metadata("design:paramtypes", [dto_1.StartGenerateDto, Object]),
     __metadata("design:returntype", Promise)
 ], GenerateController.prototype, "startGeneration", null);
+__decorate([
+    (0, common_1.Post)('pause'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], GenerateController.prototype, "pauseGeneration", null);
+__decorate([
+    (0, common_1.Post)('resume'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], GenerateController.prototype, "resumeGeneration", null);
 exports.GenerateController = GenerateController = __decorate([
     (0, common_1.Controller)('api/generate'),
     __metadata("design:paramtypes", [generate_service_1.GenerateService,

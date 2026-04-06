@@ -5,7 +5,11 @@ export declare class GenerateService {
     private readonly aiService;
     private readonly excelService;
     private readonly logger;
+    private readonly pauseMap;
     constructor(aiService: AiService, excelService: ExcelService);
+    pauseJob(uploadId: string): void;
+    resumeJob(uploadId: string): void;
+    private isPaused;
     generate(uploadId: string, provider: 'claude' | 'openai' | 'gemini', apiKey: string, model: string, batchSize: number, columnMapping: ColumnMapping, outputFileName: string): AsyncGenerator<ProgressEvent>;
     private matchResults;
 }

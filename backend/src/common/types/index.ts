@@ -71,13 +71,15 @@ export interface GenerateRequest {
 }
 
 export interface ProgressEvent {
-  type: 'progress' | 'batch_done' | 'error' | 'complete';
+  type: 'progress' | 'batch_done' | 'error' | 'complete' | 'paused';
   batch?: number;
   totalBatches?: number;
   processed?: number;
   total?: number;
   message?: string;
   downloadId?: string;
+  partialDownloadId?: string;
+  tokens?: number;
 }
 
 export const REQUIRED_COLUMNS = [

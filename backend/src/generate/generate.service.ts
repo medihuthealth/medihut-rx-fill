@@ -7,13 +7,34 @@ import { MedicineRow, AiMedicineData, ColumnMapping, ProgressEvent } from '../co
 export class GenerateService {
   private readonly logger = new Logger(GenerateService.name);
 
+  /** uploadId → paused flag */
+  private readonly pauseMap = new Map<string, boolean>();
+
   constructor(
     private readonly aiService: AiService,
     private readonly excelService: ExcelService,
   ) {}
 
+  // ── Pause / resume ──────────────────────────────────────────
+  pauseJob(uploadId: string) {
+    this.pauseMap.set(uploadId, true);
+    this.logger.log(`Job paused: ${uploadId}`);
+  }
+
+  resumeJob(uploadId: string) {
+    this.pauseMap.set(uploadId, false);
+    this.logger.log(`Job resumed: ${uploadId}`);
+  }
+
+  private isPaused(uploadId: string) {
+    return this.pauseMap.get(uploadId) === true;
+  }
+
   /**
-   * Run the generation process, yielding progress events via an async generator
+   * Run the generation process, yielding progress events via an async generator.
+   * – Emits a `partialDownloadId` in every `batch_done` event so the frontend
+   *   can offer "Download so far" after each batch.
+   * – Respects pause/resume between batches.
    */
   async *generate(
     uploadId: string,
@@ -24,6 +45,8 @@ export class GenerateService {
     columnMapping: ColumnMapping,
     outputFileName: string,
   ): AsyncGenerator<ProgressEvent> {
+    this.pauseMap.set(uploadId, false); // start unpaused
+
     // 1. Extract medicine rows
     const rows = this.excelService.extractMedicineRows(uploadId, columnMapping);
 
@@ -45,6 +68,19 @@ export class GenerateService {
 
     // 3. Process each batch
     for (let b = 0; b < batches.length; b++) {
+      // ── Pause polling ─────────────────────────────────────
+      while (this.isPaused(uploadId)) {
+        yield {
+          type: 'paused',
+          batch: b + 1,
+          totalBatches: batches.length,
+          processed,
+          total: rows.length,
+          message: `⏸ Paused — click Resume to continue`,
+        };
+        await new Promise((r) => setTimeout(r, 2_000));
+      }
+
       const batch = batches[b];
       const start = b * batchSize + 1;
       const end = Math.min(start + batchSize - 1, rows.length);
@@ -59,7 +95,6 @@ export class GenerateService {
       };
 
       try {
-        // Build numbered medicine list with packing context for better AI disambiguation
         const medicineList = batch
           .map((x, i) => {
             let line = `${i + 1}. ${x.brand}`;
@@ -68,12 +103,22 @@ export class GenerateService {
           })
           .join('\n');
 
-        const aiData = await this.aiService.callProvider(provider, apiKey, model, medicineList);
+        const aiResult = await this.aiService.callProvider(
+          provider,
+          apiKey,
+          model,
+          medicineList,
+          batch.length,
+        );
 
-        // Match AI results to input rows
-        this.matchResults(batch, aiData, filledMap);
-
+        this.matchResults(batch, aiResult.data, filledMap);
         processed += batch.length;
+
+        // ── Partial download after each successful batch ──────
+        const partialOutputData = this.excelService.buildOutput(rows, filledMap);
+        const partialId = `partial_${uploadId}_b${b + 1}_${Date.now()}`;
+        const partialName = outputFileName.replace('.xlsx', `_partial_batch${b + 1}.xlsx`);
+        this.excelService.storeResult(partialId, partialOutputData, partialName);
 
         yield {
           type: 'batch_done',
@@ -82,10 +127,11 @@ export class GenerateService {
           processed,
           total: rows.length,
           message: `Batch ${b + 1}/${batches.length} — ${batch.length} medicines ✓`,
+          partialDownloadId: partialId,
+          tokens: aiResult.tokens,
         };
       } catch (error: any) {
         processed += batch.length;
-
         this.logger.error(`Batch ${b + 1} failed: ${error.message}`);
 
         yield {
@@ -94,12 +140,20 @@ export class GenerateService {
           totalBatches: batches.length,
           processed,
           total: rows.length,
-          message: `Batch ${b + 1} failed: ${error.message?.slice(0, 100)}`,
+          message: `Batch ${b + 1} failed: ${error.message?.slice(0, 120)}`,
         };
+      }
+
+      // Inter-batch delay: breathing room between Claude requests (5 s)
+      if (b < batches.length - 1) {
+        await new Promise((r) => setTimeout(r, 5_000));
       }
     }
 
-    // 4. Build output and store for download
+    // Cleanup pause flag
+    this.pauseMap.delete(uploadId);
+
+    // 4. Build final output
     const outputData = this.excelService.buildOutput(rows, filledMap);
     const downloadId = `dl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     this.excelService.storeResult(downloadId, outputData, outputFileName);
@@ -116,9 +170,9 @@ export class GenerateService {
   }
 
   /**
-   * Match AI results to input medicine rows using fuzzy matching.
-   * This is the key fix for wrong medicine names — we enforce that
-   * the brand name in output matches the input.
+   * Map AI results back to input rows POSITIONALLY.
+   * The AI returns in the same order as the input list.
+   * Brand Name is always overwritten with the exact input string.
    */
   private matchResults(
     batch: MedicineRow[],
@@ -126,35 +180,12 @@ export class GenerateService {
     filledMap: Map<string, AiMedicineData>,
   ): void {
     const norm = (s: string) => String(s).toUpperCase().replace(/\s+/g, ' ').trim();
+    const len = Math.min(batch.length, aiData.length);
 
-    // First pass: exact or fuzzy match by brand name
-    for (const d of aiData) {
-      const aiBrand = norm(d['Brand Name'] || '');
-      if (!aiBrand) continue;
-
-      const matched = batch.find((x) => {
-        const inputBrand = norm(x.brand);
-        return (
-          inputBrand === aiBrand ||
-          aiBrand.includes(inputBrand.slice(0, 7)) ||
-          inputBrand.includes(aiBrand.slice(0, 7))
-        );
-      });
-
-      if (matched) {
-        // CRITICAL: Override the brand name to match exactly what was in the input
-        d['Brand Name'] = matched.brand;
-        filledMap.set(norm(matched.brand), d);
-      }
+    for (let i = 0; i < len; i++) {
+      const d = { ...aiData[i] };
+      d['Brand Name'] = batch[i].brand;
+      filledMap.set(norm(batch[i].brand), d);
     }
-
-    // Second pass: positional fallback for unmatched items
-    aiData.forEach((d, i) => {
-      if (i < batch.length && !filledMap.has(norm(batch[i].brand))) {
-        // Override brand name to match input
-        d['Brand Name'] = batch[i].brand;
-        filledMap.set(norm(batch[i].brand), d);
-      }
-    });
   }
 }

@@ -67,4 +67,17 @@ export class GenerateController {
     res.write('data: [DONE]\n\n');
     res.end();
   }
+  @Post('pause')
+  pauseGeneration(@Body() body: { uploadId: string }) {
+    if (!body.uploadId) throw new HttpException('uploadId required', HttpStatus.BAD_REQUEST);
+    this.generateService.pauseJob(body.uploadId);
+    return { ok: true, status: 'paused' };
+  }
+
+  @Post('resume')
+  resumeGeneration(@Body() body: { uploadId: string }) {
+    if (!body.uploadId) throw new HttpException('uploadId required', HttpStatus.BAD_REQUEST);
+    this.generateService.resumeJob(body.uploadId);
+    return { ok: true, status: 'resumed' };
+  }
 }

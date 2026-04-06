@@ -65,6 +65,7 @@ const initialState: AppState = {
   totalRows: 0,
   processedRows: 0,
   logs: [],
+  tokenUsageData: [],
   downloadId: null,
   resultStats: null,
   error: null,
@@ -116,6 +117,7 @@ function reducer(state: AppState, action: Action): AppState {
         step: 1,
         generating: false,
         logs: [],
+        tokenUsageData: [],
         downloadId: null,
         resultStats: null,
         error: null,
@@ -132,6 +134,7 @@ function reducer(state: AppState, action: Action): AppState {
         step: 4,
         generating: true,
         logs: [],
+        tokenUsageData: [],
         processedRows: 0,
         totalRows: 0,
         downloadId: null,
@@ -143,6 +146,8 @@ function reducer(state: AppState, action: Action): AppState {
       const newLogs = [...state.logs];
       const logId = `batch-${event.batch ?? 'general'}`;
 
+      let newTokenUsageData = state.tokenUsageData;
+
       if (event.type === 'progress') {
         const existingIdx = newLogs.findIndex((l) => l.id === logId);
         const entry: LogEntry = { id: logId, status: 'proc', message: event.message || '' };
@@ -153,6 +158,10 @@ function reducer(state: AppState, action: Action): AppState {
         const entry: LogEntry = { id: logId, status: 'ok', message: event.message || '' };
         if (existingIdx >= 0) newLogs[existingIdx] = entry;
         else newLogs.push(entry);
+        
+        if (event.batch !== undefined && event.tokens !== undefined) {
+          newTokenUsageData = [...state.tokenUsageData, { batch: event.batch, tokens: event.tokens }];
+        }
       } else if (event.type === 'error' && event.batch) {
         const existingIdx = newLogs.findIndex((l) => l.id === logId);
         const entry: LogEntry = { id: logId, status: 'err', message: event.message || '' };
@@ -163,6 +172,7 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         logs: newLogs,
+        tokenUsageData: newTokenUsageData,
         processedRows: event.processed ?? state.processedRows,
         totalRows: event.total ?? state.totalRows,
       };
@@ -351,6 +361,7 @@ export default function Home() {
           processedRows={state.processedRows}
           totalRows={state.totalRows}
           logs={state.logs}
+          tokenUsageData={state.tokenUsageData}
         />
       )}
 

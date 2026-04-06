@@ -115,7 +115,13 @@ export default function ProviderSelector({
               onClick={() => onProviderChange(p)}
             >
               <div className="provider-tab-check">{isActive ? '✓' : ''}</div>
-              <div className="provider-tab-icon">{info.icon}</div>
+              <div className="provider-tab-icon">
+                {info.iconPath ? (
+                  <img src={info.iconPath} alt={`${info.name} logo`} width={24} height={24} style={{ objectFit: 'contain' }} />
+                ) : (
+                  info.icon
+                )}
+              </div>
               <div className="provider-tab-name">{info.name}</div>
               <div className="provider-tab-sub">{p === 'openai' ? 'OpenAI' : p === 'claude' ? 'Anthropic' : 'Google'}</div>
             </div>

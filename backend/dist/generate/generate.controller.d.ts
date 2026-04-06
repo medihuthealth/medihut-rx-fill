@@ -7,4 +7,16 @@ export declare class GenerateController {
     private readonly excelService;
     constructor(generateService: GenerateService, excelService: ExcelService);
     startGeneration(dto: StartGenerateDto, res: express.Response): Promise<void>;
+    pauseGeneration(body: {
+        uploadId: string;
+    }): {
+        ok: boolean;
+        status: string;
+    };
+    resumeGeneration(body: {
+        uploadId: string;
+    }): {
+        ok: boolean;
+        status: string;
+    };
 }

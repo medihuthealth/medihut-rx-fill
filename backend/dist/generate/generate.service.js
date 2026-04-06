@@ -18,11 +18,24 @@ let GenerateService = GenerateService_1 = class GenerateService {
     aiService;
     excelService;
     logger = new common_1.Logger(GenerateService_1.name);
+    pauseMap = new Map();
     constructor(aiService, excelService) {
         this.aiService = aiService;
         this.excelService = excelService;
     }
+    pauseJob(uploadId) {
+        this.pauseMap.set(uploadId, true);
+        this.logger.log(`Job paused: ${uploadId}`);
+    }
+    resumeJob(uploadId) {
+        this.pauseMap.set(uploadId, false);
+        this.logger.log(`Job resumed: ${uploadId}`);
+    }
+    isPaused(uploadId) {
+        return this.pauseMap.get(uploadId) === true;
+    }
     async *generate(uploadId, provider, apiKey, model, batchSize, columnMapping, outputFileName) {
+        this.pauseMap.set(uploadId, false);
         const rows = this.excelService.extractMedicineRows(uploadId, columnMapping);
         if (rows.length === 0) {
             yield { type: 'error', message: 'No valid medicine rows found' };
@@ -36,6 +49,17 @@ let GenerateService = GenerateService_1 = class GenerateService {
         const filledMap = new Map();
         let processed = 0;
         for (let b = 0; b < batches.length; b++) {
+            while (this.isPaused(uploadId)) {
+                yield {
+                    type: 'paused',
+                    batch: b + 1,
+                    totalBatches: batches.length,
+                    processed,
+                    total: rows.length,
+                    message: `⏸ Paused — click Resume to continue`,
+                };
+                await new Promise((r) => setTimeout(r, 2_000));
+            }
             const batch = batches[b];
             const start = b * batchSize + 1;
             const end = Math.min(start + batchSize - 1, rows.length);
@@ -56,9 +80,13 @@ let GenerateService = GenerateService_1 = class GenerateService {
                     return line;
                 })
                     .join('\n');
-                const aiData = await this.aiService.callProvider(provider, apiKey, model, medicineList);
-                this.matchResults(batch, aiData, filledMap);
+                const aiResult = await this.aiService.callProvider(provider, apiKey, model, medicineList, batch.length);
+                this.matchResults(batch, aiResult.data, filledMap);
                 processed += batch.length;
+                const partialOutputData = this.excelService.buildOutput(rows, filledMap);
+                const partialId = `partial_${uploadId}_b${b + 1}_${Date.now()}`;
+                const partialName = outputFileName.replace('.xlsx', `_partial_batch${b + 1}.xlsx`);
+                this.excelService.storeResult(partialId, partialOutputData, partialName);
                 yield {
                     type: 'batch_done',
                     batch: b + 1,
@@ -66,6 +94,8 @@ let GenerateService = GenerateService_1 = class GenerateService {
                     processed,
                     total: rows.length,
                     message: `Batch ${b + 1}/${batches.length} — ${batch.length} medicines ✓`,
+                    partialDownloadId: partialId,
+                    tokens: aiResult.tokens,
                 };
             }
             catch (error) {
@@ -77,10 +107,14 @@ let GenerateService = GenerateService_1 = class GenerateService {
                     totalBatches: batches.length,
                     processed,
                     total: rows.length,
-                    message: `Batch ${b + 1} failed: ${error.message?.slice(0, 100)}`,
+                    message: `Batch ${b + 1} failed: ${error.message?.slice(0, 120)}`,
                 };
             }
+            if (b < batches.length - 1) {
+                await new Promise((r) => setTimeout(r, 5_000));
+            }
         }
+        this.pauseMap.delete(uploadId);
         const outputData = this.excelService.buildOutput(rows, filledMap);
         const downloadId = `dl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         this.excelService.storeResult(downloadId, outputData, outputFileName);
@@ -95,27 +129,12 @@ let GenerateService = GenerateService_1 = class GenerateService {
     }
     matchResults(batch, aiData, filledMap) {
         const norm = (s) => String(s).toUpperCase().replace(/\s+/g, ' ').trim();
-        for (const d of aiData) {
-            const aiBrand = norm(d['Brand Name'] || '');
-            if (!aiBrand)
-                continue;
-            const matched = batch.find((x) => {
-                const inputBrand = norm(x.brand);
-                return (inputBrand === aiBrand ||
-                    aiBrand.includes(inputBrand.slice(0, 7)) ||
-                    inputBrand.includes(aiBrand.slice(0, 7)));
-            });
-            if (matched) {
-                d['Brand Name'] = matched.brand;
-                filledMap.set(norm(matched.brand), d);
-            }
+        const len = Math.min(batch.length, aiData.length);
+        for (let i = 0; i < len; i++) {
+            const d = { ...aiData[i] };
+            d['Brand Name'] = batch[i].brand;
+            filledMap.set(norm(batch[i].brand), d);
         }
-        aiData.forEach((d, i) => {
-            if (i < batch.length && !filledMap.has(norm(batch[i].brand))) {
-                d['Brand Name'] = batch[i].brand;
-                filledMap.set(norm(batch[i].brand), d);
-            }
-        });
     }
 };
 exports.GenerateService = GenerateService;

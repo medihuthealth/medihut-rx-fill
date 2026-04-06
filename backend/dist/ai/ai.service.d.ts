@@ -5,7 +5,10 @@ export declare class AiService {
         valid: boolean;
         message: string;
     }>;
-    callProvider(provider: AiProvider, apiKey: string, model: string, medicineList: string): Promise<AiMedicineData[]>;
+    callProvider(provider: AiProvider, apiKey: string, model: string, medicineList: string, batchSize?: number): Promise<{
+        data: AiMedicineData[];
+        tokens: number;
+    }>;
     private validateClaude;
     private callClaude;
     private validateOpenAI;

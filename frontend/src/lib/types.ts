@@ -8,6 +8,7 @@ export interface ProviderInfo {
   id: AiProvider;
   name: string;
   icon: string;
+  iconPath?: string;
   keyPrefix: string;
   keyHint: string;
   link: string;
@@ -20,6 +21,7 @@ export const PROVIDERS: Record<AiProvider, ProviderInfo> = {
     id: 'claude',
     name: 'Claude',
     icon: '🟠',
+    iconPath: '/claude_logo.svg',
     keyPrefix: 'sk-ant-',
     keyHint: 'sk-ant-api03-...',
     link: 'https://console.anthropic.com/settings/keys',
@@ -34,6 +36,7 @@ export const PROVIDERS: Record<AiProvider, ProviderInfo> = {
     id: 'openai',
     name: 'OpenAI',
     icon: '🟢',
+    iconPath: '/chatgpt_logo.png',
     keyPrefix: 'sk-',
     keyHint: 'sk-proj-... or sk-...',
     link: 'https://platform.openai.com/api-keys',
@@ -48,6 +51,7 @@ export const PROVIDERS: Record<AiProvider, ProviderInfo> = {
     id: 'gemini',
     name: 'Gemini',
     icon: '🔵',
+    iconPath: '/gemini_logo.png',
     keyPrefix: 'AIza',
     keyHint: 'AIzaSy...',
     link: 'https://aistudio.google.com/app/apikey',
@@ -103,6 +107,7 @@ export interface ProgressEvent {
   total?: number;
   message?: string;
   downloadId?: string;
+  tokens?: number;
 }
 
 export interface LogEntry {
@@ -134,6 +139,7 @@ export interface AppState {
   totalRows: number;
   processedRows: number;
   logs: LogEntry[];
+  tokenUsageData: { batch: number; tokens: number }[];
   downloadId: string | null;
   resultStats: { total: number; filled: number; needReview: number } | null;
   error: string | null;
